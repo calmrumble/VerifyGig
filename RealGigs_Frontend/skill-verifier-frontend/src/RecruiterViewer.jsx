@@ -1,183 +1,162 @@
-import React, { useEffect, useState } from "react";
+// src/RecruiterViewer.jsx
+import React, { useEffect, useState, useCallback } from "react";
 import Web3 from "web3";
+import { useParams, useNavigate } from "react-router-dom";
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "./contrac";
 
-// UI-only refreshed RecruiterViewer (JSX). Logic and Web3 calls are unchanged.
-// Recommend adding these fonts to your index.html for the intended look:
-// <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+export default function RecruiterViewer() {
+  const { publicId } = useParams();           // optional param from URL
+  const navigate = useNavigate();
 
-function RecruiterViewer() {
   const [skills, setSkills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [searchValue, setSearchValue] = useState(publicId || "");
+  const [rpcUrl, setRpcUrl] = useState("http://127.0.0.1:8545"); // adjust if needed
 
-  useEffect(() => {
-    const loadSkills = async () => {
+  // Validate Ethereum-like address (basic)
+  const isMaybeAddress = (v) => /^0x[a-fA-F0-9]{40}$/.test(v);
+
+  const loadVerifiedSkills = useCallback(
+    async (filterWorker = "") => {
+      setLoading(true);
+      setError("");
       try {
-        const web3 = new Web3("http://127.0.0.1:8545"); // Update if needed
+        const web3 = new Web3(rpcUrl);
         const accounts = await web3.eth.getAccounts();
+        const fromAddr = accounts[0] || undefined;
+
         const contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
 
-        // ✅ Use 'from' field to avoid Web3ValidatorError
-        const ids = await contract.methods.getAllSkillIds().call({ from: accounts[0] });
+        // call getAllSkillIds
+        const ids = await contract.methods.getAllSkillIds().call({ from: fromAddr });
 
         const verified = [];
 
         for (let id of ids) {
-          const skill = await contract.methods.skills(id).call({ from: accounts[0] });
+          if (!id) continue;
+          const skill = await contract.methods.skills(id).call({ from: fromAddr });
+          // skill is expected to have verified, worker, notes, interviewer, skillName etc.
           if (skill.verified) {
-            verified.push({ ...skill, skillId: id });
+            // if filterWorker set, push only worker matches (case-insensitive)
+            if (!filterWorker || skill.worker.toLowerCase() === filterWorker.toLowerCase()) {
+              verified.push({ ...skill, skillId: id });
+            }
           }
         }
 
         setSkills(verified);
         setLoading(false);
       } catch (err) {
-        console.error("❌ Failed to load verified skills:", err);
+        console.error("Failed to load verified skills:", err);
         setError("Blockchain connection failed or skill fetch failed.");
         setLoading(false);
       }
-    };
+    },
+    [rpcUrl]
+  );
 
-    loadSkills();
-  }, []);
+  // initial load (uses URL param publicId if present)
+  useEffect(() => {
+    if (publicId) {
+      setSearchValue(publicId);
+      // optional: validate before loading
+      if (!isMaybeAddress(publicId)) {
+        setError("Invalid address in URL.");
+        setSkills([]);
+        setLoading(false);
+        return;
+      }
+    }
+    // load — pass publicId if present, otherwise fetch all verified
+    loadVerifiedSkills(publicId || "");
+  }, [publicId, loadVerifiedSkills]);
 
-  // ---------- Styles (inline, JS object) ----------
-  const styles = {
-    page: {
-      minHeight: "100vh",
-      padding: 36,
-      background: "radial-gradient(1200px 600px at 10% 10%, rgba(3,169,244,0.04), transparent), linear-gradient(180deg,#071225 0%, #0b1020 100%)",
-      color: "#E6F0FA",
-      fontFamily: "'Open Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial",
-    },
-    container: {
-      maxWidth: 980,
-      margin: "0 auto",
-    },
-    header: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-      marginBottom: 20,
-    },
-    title: {
-      fontFamily: "'Poppins', sans-serif",
-      fontWeight: 700,
-      fontSize: 22,
-      color: "#E8F6FF",
-    },
-    subtitle: {
-      fontSize: 13,
-      color: "#9BB8CC",
-    },
-    list: {
-      marginTop: 12,
-      display: "grid",
-      gap: 14,
-    },
-    card: {
-      background: "linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))",
-      border: "1px solid rgba(255,255,255,0.04)",
-      borderRadius: 12,
-      padding: 16,
-      boxShadow: "0 8px 30px rgba(2,8,23,0.6)",
-    },
-    skillHeader: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-      marginBottom: 8,
-    },
-    skillName: {
-      fontFamily: "'Poppins', sans-serif",
-      fontSize: 16,
-      fontWeight: 600,
-      color: "#EAF8FF",
-    },
-    meta: {
-      fontSize: 13,
-      color: "#9BB8CC",
-    },
-    notes: {
-      marginTop: 8,
-      fontSize: 14,
-      color: "#CFEFF8",
-    },
-    empty: {
-      padding: 20,
-      textAlign: "center",
-      color: "#9BB8CC",
-    },
+  // Search button handler: updates URL and loads skills for the entered id
+  const onSearch = async () => {
+    const val = (searchValue || "").trim();
+    if (!val) {
+      // navigate to base recruiter view (all)
+      navigate("/recruiter", { replace: true });
+      loadVerifiedSkills("");
+      return;
+    }
+    if (!isMaybeAddress(val)) {
+      setError("Please enter a valid Ethereum address (0x...).");
+      return;
+    }
+    // update URL and load
+    navigate(`/recruiter/${val}`, { replace: true });
+    setError("");
+    loadVerifiedSkills(val);
   };
 
-  if (loading)
-    return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <div style={styles.header}>
-            <div>
-              <div style={styles.title}>📋 Verified Skills (Recruiter View)</div>
-              <div style={styles.subtitle}>Browse tamper-proof verified skills from the blockchain.</div>
-            </div>
-          </div>
-
-          <div style={styles.empty}>⏳ Loading verified skills...</div>
-        </div>
-      </div>
-    );
-
-  if (error)
-    return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <div style={styles.header}>
-            <div>
-              <div style={styles.title}>📋 Verified Skills (Recruiter View)</div>
-              <div style={styles.subtitle}>Browse tamper-proof verified skills from the blockchain.</div>
-            </div>
-          </div>
-
-          <div style={{ ...styles.empty, color: "#FF9580" }}>{error}</div>
-        </div>
-      </div>
-    );
-
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <div>
-            <div style={styles.title}>📋 Verified Skills (Recruiter View)</div>
-            <div style={styles.subtitle}>Browse tamper-proof verified skills from the blockchain.</div>
-          </div>
+    <div style={{ padding: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 18 }}>
+        <div>
+          <h2 style={{ margin: 0 }}>📋 Verified Skills (Recruiter View)</h2>
+          <div style={{ color: "#9BB8CC", marginTop: 6 }}>Browse tamper-proof verified skills from the blockchain.</div>
         </div>
 
-        <div style={styles.list}>
-          {skills.length === 0 && <div style={styles.empty}>No verified skills yet.</div>}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            placeholder="Enter public address (0x...) or leave empty"
+            style={{
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "1px solid rgba(255,255,255,0.06)",
+              background: "transparent",
+              color: "inherit",
+              minWidth: 320,
+            }}
+          />
+          <button onClick={onSearch} style={{ padding: "8px 12px", borderRadius: 8 }}>
+            Search
+          </button>
+        </div>
+      </div>
 
-          {skills.map((skill) => (
-            <div key={skill.skillId} style={styles.card}>
-              <div style={styles.skillHeader}>
-                <div style={styles.skillName}>✅ {skill.skillName}</div>
-                <div style={styles.meta}>ID: <span style={{ color: "#00ffc3" }}>{skill.skillId}</span></div>
-              </div>
+      {loading && <div style={{ color: "#9BB8CC" }}>⏳ Loading verified skills...</div>}
+      {error && <div style={{ color: "#FF9580" }}>{error}</div>}
 
-              <div style={styles.meta}>Worker: {skill.worker}</div>
-              <div style={styles.meta}>Interviewer: {skill.interviewer}</div>
+      {!loading && !error && skills.length === 0 && (
+        <div style={{ color: "#9BB8CC", padding: 18 }}>No verified skills found{searchValue ? ` for ${searchValue}` : "."}</div>
+      )}
 
-              <div style={styles.notes}>
-                <strong style={{ color: "#D9F7FF" }}>Notes:</strong>
-                <div style={{ marginTop: 6 }}>{skill.notes || <span style={{ color: "#89B3CC" }}>— no notes provided —</span>}</div>
-              </div>
+      <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+        {skills.map((skill) => (
+          <div
+            key={skill.skillId}
+            style={{
+              padding: 14,
+              borderRadius: 10,
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.04)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontWeight: 700 }}>{skill.skillName || "Unnamed skill"}</div>
+              <div style={{ color: "#00ffc3" }}>ID: {skill.skillId}</div>
             </div>
-          ))}
-        </div>
+
+            <div style={{ color: "#9BB8CC", marginTop: 6 }}>
+              Worker: <span style={{ color: "#D9F7FF" }}>{skill.worker}</span>
+            </div>
+
+            <div style={{ color: "#9BB8CC", marginTop: 6 }}>
+              Interviewer: <span style={{ color: "#D9F7FF" }}>{skill.interviewer}</span>
+            </div>
+
+            <div style={{ marginTop: 10 }}>
+              <div style={{ color: "#D9F7FF", fontWeight: 600 }}>Notes</div>
+              <div style={{ color: "#CFEFF8", marginTop: 6 }}>{skill.notes || <span style={{ color: "#89B3CC" }}>— no notes provided —</span>}</div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
-
-export default RecruiterViewer;

@@ -8,6 +8,7 @@ import WorkerDashboard from "./WorkerDashboard";
 import RecruiterViewer from "./RecruiterViewer";
 import { Routes, Route, Link } from "react-router-dom";
 
+
 export default function App() {
   const [account, setAccount] = useState("");
   const [contract, setContract] = useState(null);
@@ -106,7 +107,7 @@ export default function App() {
 
         <main style={styles.cardWrapper}>
           <Routes>
-            <Route path="/recruiter" element={<RecruiterViewer />} />
+            <Route path="/recruiter/:publicId?" element={<RecruiterViewer />} />
             <Route
               path="/"
               element={
