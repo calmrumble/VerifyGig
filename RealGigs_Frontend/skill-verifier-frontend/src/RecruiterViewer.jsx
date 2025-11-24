@@ -95,7 +95,7 @@ export default function RecruiterViewer() {
     <div style={{ padding: 24 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 18 }}>
         <div>
-          <h2 style={{ margin: 0 }}>📋 Verified Skills (Recruiter View)</h2>
+          <h2 style={{ margin: 0 }}>Verified Skills (Recruiter View)</h2>
           <div style={{ color: "#9BB8CC", marginTop: 6 }}>Browse tamper-proof verified skills from the blockchain.</div>
         </div>
 

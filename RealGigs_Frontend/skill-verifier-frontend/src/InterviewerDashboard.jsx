@@ -135,7 +135,7 @@ function InterviewerDashboard({ contract, account }) {
       <div style={styles.container}>
         {/* HEADER */}
         <div style={styles.header}>
-          <div style={styles.title}>🧑‍💼 Interviewer Dashboard</div>
+          <div style={styles.title}> Interviewer Dashboard</div>
 
           <div style={{ textAlign: "right", fontSize: 13 }}>
             <div style={{ color: "#9fcfe8", fontWeight: 600 }}>Connected</div>

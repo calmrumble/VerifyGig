@@ -75,7 +75,7 @@ function WorkerDashboard({ contract, account }) {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <div style={styles.title}>👨‍💻 Worker Dashboard</div>
+        <div style={styles.title}>Worker Dashboard</div>
 
         <div style={styles.card}>
           <div style={styles.label}>Skill ID</div>
